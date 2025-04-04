@@ -43,16 +43,23 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // Save theme preference to localStorage
     localStorage.setItem('theme', theme);
     
-    // Attempt to update theme.json via API
-    // This is optional and would need a corresponding API endpoint
-    fetch('/api/theme', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ appearance: theme }),
-    }).catch(() => {
-      // Silent fail - the theme will still work client-side
-      // even if we can't update the JSON file
-    });
+    // Only make the API call once to avoid potential loops
+    const savedTheme = localStorage.getItem('last-api-theme');
+    if (savedTheme !== theme) {
+      // Attempt to update theme.json via API
+      fetch('/api/theme', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appearance: theme }),
+      })
+        .then(() => {
+          localStorage.setItem('last-api-theme', theme);
+        })
+        .catch(() => {
+          // Silent fail - the theme will still work client-side
+          // even if we can't update the JSON file
+        });
+    }
   }, [theme]);
 
   return (
