@@ -48,7 +48,7 @@ export default function Login() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     loginMutation.mutate({ 
-      username: values.email, 
+      email: values.email, 
       password: values.password 
     }, {
       onSuccess: () => {
