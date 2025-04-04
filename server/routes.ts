@@ -285,16 +285,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/events', authMiddleware, adminMiddleware, async (req: Request, res: Response) => {
     try {
-      const validatedData = insertEventSchema.safeParse(req.body);
+      console.log('Received event data:', req.body);
+      
+      // Process the date properly
+      const data = { ...req.body };
+      
+      // If date is a string, convert it to a valid Date object
+      if (typeof data.date === 'string') {
+        // Ensure it's a valid date
+        const parsedDate = new Date(data.date);
+        if (isNaN(parsedDate.getTime())) {
+          return res.status(400).json({ 
+            message: 'Invalid date format',
+            details: `Could not parse date: ${data.date}`
+          });
+        }
+        data.date = parsedDate.toISOString();
+      }
+      
+      const validatedData = insertEventSchema.safeParse(data);
       
       if (!validatedData.success) {
-        return res.status(400).json({ message: 'Invalid input data', errors: validatedData.error.format() });
+        console.error('Validation error:', validatedData.error.format());
+        return res.status(400).json({ 
+          message: 'Invalid input data', 
+          errors: validatedData.error.format() 
+        });
       }
       
       const newEvent = await storage.createEvent(validatedData.data);
       res.status(201).json(newEvent);
     } catch (error) {
-      console.error(error);
+      console.error('Event creation error:', error);
       res.status(500).json({ message: 'Failed to create event' });
     }
   });
@@ -313,16 +335,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Event not found' });
       }
       
-      const validatedData = insertEventSchema.partial().safeParse(req.body);
+      console.log('Received event update data:', req.body);
+      
+      // Process the date properly
+      const data = { ...req.body };
+      
+      // If date is a string, convert it to a valid Date object
+      if (typeof data.date === 'string') {
+        // Ensure it's a valid date
+        const parsedDate = new Date(data.date);
+        if (isNaN(parsedDate.getTime())) {
+          return res.status(400).json({ 
+            message: 'Invalid date format',
+            details: `Could not parse date: ${data.date}`
+          });
+        }
+        data.date = parsedDate.toISOString();
+      }
+      
+      const validatedData = insertEventSchema.partial().safeParse(data);
       
       if (!validatedData.success) {
-        return res.status(400).json({ message: 'Invalid input data', errors: validatedData.error.format() });
+        console.error('Validation error:', validatedData.error.format());
+        return res.status(400).json({ 
+          message: 'Invalid input data', 
+          errors: validatedData.error.format() 
+        });
       }
       
       const updatedEvent = await storage.updateEvent(eventId, validatedData.data);
       res.json(updatedEvent);
     } catch (error) {
-      console.error(error);
+      console.error('Event update error:', error);
       res.status(500).json({ message: 'Failed to update event' });
     }
   });

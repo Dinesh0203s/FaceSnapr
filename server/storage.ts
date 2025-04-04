@@ -136,14 +136,23 @@ export class MemStorage implements IStorage {
   async createEvent(insertEvent: InsertEvent): Promise<Event> {
     const id = this.eventIdCounter++;
     const now = new Date();
+    
+    // Handle date format
+    const eventData = { ...insertEvent };
+    
+    // If date is a string, convert to Date if needed
+    if (typeof eventData.date === 'string') {
+      eventData.date = new Date(eventData.date);
+    }
+    
     const event: Event = { 
       id,
-      name: insertEvent.name,
-      description: insertEvent.description ?? null,
-      date: insertEvent.date,
-      location: insertEvent.location ?? null,
-      pin: insertEvent.pin,
-      createdBy: insertEvent.createdBy,
+      name: eventData.name,
+      description: eventData.description ?? null,
+      date: eventData.date,
+      location: eventData.location ?? null,
+      pin: eventData.pin,
+      createdBy: eventData.createdBy,
       createdAt: now
     };
     this.events.set(id, event);
@@ -154,7 +163,15 @@ export class MemStorage implements IStorage {
     const event = this.events.get(id);
     if (!event) return undefined;
     
-    const updatedEvent: Event = { ...event, ...updates };
+    // Handle date format
+    const updateData = { ...updates };
+    
+    // If date is a string, convert to Date if needed
+    if (updateData.date && typeof updateData.date === 'string') {
+      updateData.date = new Date(updateData.date);
+    }
+    
+    const updatedEvent: Event = { ...event, ...updateData };
     this.events.set(id, updatedEvent);
     
     return updatedEvent;
@@ -279,14 +296,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEvent(insertEvent: InsertEvent): Promise<Event> {
-    const [event] = await db.insert(events).values(insertEvent).returning();
+    // Handle date format
+    const eventData = { ...insertEvent };
+    
+    // If date is a string, convert to Date if needed
+    if (typeof eventData.date === 'string') {
+      eventData.date = new Date(eventData.date);
+    }
+    
+    // @ts-ignore - Handle TypeScript error about string | Date
+    const [event] = await db.insert(events).values(eventData).returning();
     return event;
   }
 
   async updateEvent(id: number, updates: Partial<Event>): Promise<Event | undefined> {
+    // Handle date format
+    const updateData = { ...updates };
+    
+    // If date is a string, convert to Date if needed
+    if (updateData.date && typeof updateData.date === 'string') {
+      updateData.date = new Date(updateData.date);
+    }
+    
+    // @ts-ignore - Handle TypeScript error about string | Date
     const [updatedEvent] = await db
       .update(events)
-      .set(updates)
+      .set(updateData)
       .where(eq(events.id, id))
       .returning();
     return updatedEvent;

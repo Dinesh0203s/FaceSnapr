@@ -61,14 +61,25 @@ export const eventsRelations = relations(events, ({ one, many }) => ({
   photoHistory: many(photoHistory, { relationName: "event_photo_history" }),
 }));
 
-export const insertEventSchema = createInsertSchema(events).pick({
-  name: true,
-  description: true,
-  date: true,
-  location: true,
-  pin: true,
-  createdBy: true,
-});
+// Custom schema for event insertion with date handling
+export const insertEventSchema = createInsertSchema(events)
+  .pick({
+    name: true,
+    description: true,
+    location: true,
+    pin: true,
+    createdBy: true,
+  })
+  .extend({
+    // Accept both Date objects and ISO strings for the date field
+    date: z.union([
+      z.date(),
+      z.string().refine(
+        (val) => !isNaN(new Date(val).getTime()),
+        { message: "Invalid date string format" }
+      )
+    ]),
+  });
 
 // Photo schema
 export const photos = pgTable("photos", {
