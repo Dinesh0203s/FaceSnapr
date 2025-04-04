@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import AdminSidebar from "@/components/AdminSidebar";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import ErrorBoundary from "@/components/ErrorBoundary";
