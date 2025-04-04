@@ -62,8 +62,10 @@ export default function AdminAddEvent() {
   // Add event mutation
   const addEventMutation = useMutation({
     mutationFn: async (data: FormValues) => {
+      // Convert the date object to an ISO string format that the server can handle
       const eventData = {
         ...data,
+        date: data.date.toISOString(), // Ensure date is properly formatted
         createdBy: user?.id || 0, // Fallback to 0 if no user ID (should never happen)
       };
       

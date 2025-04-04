@@ -91,6 +91,7 @@ export default function AdminEditEvent({ id }: AdminEditEventProps) {
     mutationFn: async (data: FormValues) => {
       const eventData = {
         ...data,
+        date: data.date.toISOString(), // Ensure date is properly formatted
         createdBy: event?.createdBy || user?.id || 0,
       };
       
