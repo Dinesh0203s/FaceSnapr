@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { useAuth } from '@/context/AuthContext';
+// Temporarily comment out for debugging
+// import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,7 +26,11 @@ import {
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { isAuthenticated, user, logout, isAdmin } = useAuth();
+  // Temporarily use hardcoded values for debugging
+  const isAuthenticated = false;
+  const user = null;
+  const isAdmin = false;
+  const logout = () => console.log('logout');
   const { theme, toggleTheme } = useTheme();
   const [location] = useLocation();
 

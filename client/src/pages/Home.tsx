@@ -3,10 +3,12 @@ import MainLayout from "@/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import EventCard from "@/components/EventCard";
-import { useAuth } from "@/context/AuthContext";
+// Temporarily comment out useAuth to debug error
+// import { useAuth } from "@/context/AuthContext";
 
 export default function Home() {
-  const { isAuthenticated } = useAuth();
+  // Temporarily use a hardcoded value instead of useAuth to debug
+  const isAuthenticated = false;
   
   const { data: events, isLoading } = useQuery({
     queryKey: ['/api/events'],

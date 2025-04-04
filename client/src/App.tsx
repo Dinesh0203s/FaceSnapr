@@ -17,6 +17,8 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import AdminEvents from "@/pages/AdminEvents";
 import AdminAddEvent from "@/pages/AdminAddEvent";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 
 function Router() {
   return (
@@ -68,10 +70,14 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <Router />
-        <Toaster />
-      </QueryClientProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <QueryClientProvider client={queryClient}>
+            <Router />
+            <Toaster />
+          </QueryClientProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
