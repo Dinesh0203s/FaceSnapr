@@ -19,7 +19,7 @@ import AdminAddEvent from "@/pages/AdminAddEvent";
 import AdminEditEvent from "@/pages/AdminEditEvent";
 import AdminEventPhotos from "@/pages/AdminEventPhotos";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider } from "./hooks/use-auth";
 import { ThemeProvider } from "./context/ThemeContext";
 
 function Router() {
@@ -85,14 +85,14 @@ function Router() {
 function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
+      <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <QueryClientProvider client={queryClient}>
+          <AuthProvider>
             <Router />
             <Toaster />
-          </QueryClientProvider>
+          </AuthProvider>
         </ThemeProvider>
-      </AuthProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 }

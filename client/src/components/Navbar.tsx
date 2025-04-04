@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/context/ThemeContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,9 +25,12 @@ import {
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, isAuthenticated, isAdmin, logout } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [location] = useLocation();
+  
+  const isAuthenticated = !!user;
+  const isAdmin = !!user?.isAdmin;
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
@@ -118,7 +121,7 @@ export default function Navbar() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
                     className="cursor-pointer text-destructive focus:text-destructive"
-                    onClick={logout}
+                    onClick={() => logoutMutation.mutate()}
                   >
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
@@ -251,7 +254,7 @@ export default function Navbar() {
                 <button
                   className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-destructive hover:bg-destructive/10"
                   onClick={() => {
-                    logout();
+                    logoutMutation.mutate();
                     setMobileMenuOpen(false);
                   }}
                 >

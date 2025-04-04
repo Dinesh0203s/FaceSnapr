@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import MainLayout from "@/layouts/MainLayout";
 
@@ -31,8 +31,8 @@ const formSchema = z.object({
 
 export default function Register() {
   const [, setLocation] = useLocation();
-  const { register, isAuthenticated } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
+  const { user, registerMutation } = useAuth();
+  const isAuthenticated = !!user;
 
   // Redirect if already logged in - use useEffect to avoid React render phase state updates
   useEffect(() => {
@@ -53,16 +53,12 @@ export default function Register() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true);
-    try {
-      const { confirmPassword, ...userData } = values;
-      const success = await register(userData);
-      if (success) {
+    const { confirmPassword, ...userData } = values;
+    registerMutation.mutate(userData, {
+      onSuccess: () => {
         setLocation("/login");
       }
-    } finally {
-      setIsLoading(false);
-    }
+    });
   }
 
   return (
@@ -162,9 +158,9 @@ export default function Register() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isLoading}
+                disabled={registerMutation.isPending}
               >
-                {isLoading ? (
+                {registerMutation.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
                 Create Account

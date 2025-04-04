@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import MainLayout from "@/layouts/MainLayout";
 import { userAuthSchema } from "@shared/schema";
@@ -26,9 +26,9 @@ const formSchema = userAuthSchema.extend({
 
 export default function Login() {
   const [, setLocation] = useLocation();
-  const { login, isAuthenticated } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-
+  const { user, loginMutation } = useAuth();
+  const isAuthenticated = !!user;
+  
   // Redirect if already logged in
   // Use useEffect to handle redirects to avoid React render phase state updates
   useEffect(() => {
@@ -47,15 +47,14 @@ export default function Login() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true);
-    try {
-      const success = await login(values.email, values.password);
-      if (success) {
+    loginMutation.mutate({ 
+      username: values.email, 
+      password: values.password 
+    }, {
+      onSuccess: () => {
         setLocation("/");
       }
-    } finally {
-      setIsLoading(false);
-    }
+    });
   }
 
   return (
@@ -136,9 +135,9 @@ export default function Login() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isLoading}
+                disabled={loginMutation.isPending}
               >
-                {isLoading ? (
+                {loginMutation.isPending ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : null}
                 Sign in
