@@ -17,32 +17,54 @@ export async function initFaceApi() {
   if (modelsLoaded) return;
   
   try {
-    // Models path in the project
-    const modelsPath = path.join(process.cwd(), 'dist', 'models');
+    // First try the public directory where we downloaded the models
+    const publicModelsPath = path.join(process.cwd(), 'public', 'models');
+    
+    // Check if models exist in public folder
+    if (fs.existsSync(publicModelsPath) && 
+        fs.existsSync(path.join(publicModelsPath, 'ssd_mobilenetv1_model-weights_manifest.json'))) {
+      
+      // Load models from public directory
+      await Promise.all([
+        faceapi.nets.ssdMobilenetv1.loadFromDisk(publicModelsPath),
+        faceapi.nets.faceLandmark68Net.loadFromDisk(publicModelsPath),
+        faceapi.nets.faceRecognitionNet.loadFromDisk(publicModelsPath)
+      ]);
+      
+      modelsLoaded = true;
+      log('Face-api models loaded successfully from public directory', 'face-api');
+      return;
+    }
+    
+    // Try dist directory as fallback
+    const distModelsPath = path.join(process.cwd(), 'dist', 'models');
     
     // Create models directory if it doesn't exist
-    if (!fs.existsSync(modelsPath)) {
-      fs.mkdirSync(modelsPath, { recursive: true });
+    if (!fs.existsSync(distModelsPath)) {
+      fs.mkdirSync(distModelsPath, { recursive: true });
     }
     
     // Load models
     await Promise.all([
-      faceapi.nets.ssdMobilenetv1.loadFromDisk(modelsPath),
-      faceapi.nets.faceLandmark68Net.loadFromDisk(modelsPath),
-      faceapi.nets.faceRecognitionNet.loadFromDisk(modelsPath)
+      faceapi.nets.ssdMobilenetv1.loadFromDisk(distModelsPath),
+      faceapi.nets.faceLandmark68Net.loadFromDisk(distModelsPath),
+      faceapi.nets.faceRecognitionNet.loadFromDisk(distModelsPath)
     ]);
     
     modelsLoaded = true;
-    log('Face-api models loaded successfully', 'face-api');
+    log('Face-api models loaded successfully from dist directory', 'face-api');
   } catch (error) {
-    log(`Error loading face-api models: ${error}`, 'face-api');
-    // Attempt to download models from CDN if local loading fails
+    log(`Error loading face-api models locally: ${error}`, 'face-api');
+    
+    // Attempt to load from CDN as a last resort
     try {
+      const cdnUrl = 'https://justadudewhohacks.github.io/face-api.js/weights';
       await Promise.all([
-        faceapi.nets.ssdMobilenetv1.load('/models'),
-        faceapi.nets.faceLandmark68Net.load('/models'),
-        faceapi.nets.faceRecognitionNet.load('/models')
+        faceapi.nets.ssdMobilenetv1.loadFromUri(cdnUrl),
+        faceapi.nets.faceLandmark68Net.loadFromUri(cdnUrl),
+        faceapi.nets.faceRecognitionNet.loadFromUri(cdnUrl)
       ]);
+      
       modelsLoaded = true;
       log('Face-api models loaded from CDN', 'face-api');
     } catch (cdnError) {

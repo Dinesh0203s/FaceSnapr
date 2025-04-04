@@ -8,7 +8,7 @@ export async function initFaceApi() {
   if (modelsLoaded) return;
   
   try {
-    // Load models from public directory
+    // First try loading models from local public directory
     await Promise.all([
       faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
       faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
@@ -16,10 +16,25 @@ export async function initFaceApi() {
     ]);
     
     modelsLoaded = true;
-    console.log('Face-api models loaded successfully');
+    console.log('Face-api models loaded successfully from local path');
   } catch (error) {
     console.error('Error loading face-api models:', error);
-    throw new Error('Failed to load face recognition models');
+    
+    // Try loading from CDN as a fallback
+    try {
+      const cdnUrl = 'https://justadudewhohacks.github.io/face-api.js/weights';
+      await Promise.all([
+        faceapi.nets.ssdMobilenetv1.loadFromUri(cdnUrl),
+        faceapi.nets.faceLandmark68Net.loadFromUri(cdnUrl),
+        faceapi.nets.faceRecognitionNet.loadFromUri(cdnUrl)
+      ]);
+      
+      modelsLoaded = true;
+      console.log('Face-api models loaded successfully from CDN');
+    } catch (cdnError) {
+      console.error('Error loading face-api models from CDN:', cdnError);
+      throw new Error('Failed to load face recognition models');
+    }
   }
 }
 
