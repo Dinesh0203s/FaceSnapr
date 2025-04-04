@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -34,11 +34,12 @@ export default function Register() {
   const { register, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if already logged in
-  if (isAuthenticated) {
-    setLocation("/");
-    return null;
-  }
+  // Redirect if already logged in - use useEffect to avoid React render phase state updates
+  useEffect(() => {
+    if (isAuthenticated) {
+      setLocation("/");
+    }
+  }, [isAuthenticated, setLocation]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
