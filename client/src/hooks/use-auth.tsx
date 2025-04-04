@@ -18,6 +18,9 @@ type AuthContextType = {
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
+  // Legacy method compatibility
+  forgotPassword: (email: string) => Promise<boolean>;
+  resetPassword: (token: string, password: string) => Promise<boolean>;
 };
 
 // Interface for login data to match the server's expected fields
@@ -100,6 +103,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  // Legacy method implementations using modern API
+  const forgotPassword = async (email: string): Promise<boolean> => {
+    try {
+      await apiRequest("POST", "/api/auth/forgot-password", { email });
+      toast({
+        title: "Password Reset Email Sent",
+        description: "If your email is in our system, you'll receive a password reset link shortly.",
+      });
+      return true;
+    } catch (error) {
+      toast({
+        title: "Password Reset Failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const resetPassword = async (token: string, password: string): Promise<boolean> => {
+    try {
+      await apiRequest("POST", "/api/auth/reset-password", { token, password });
+      toast({
+        title: "Password Reset Successful",
+        description: "Your password has been updated. You can now log in with your new password.",
+      });
+      return true;
+    } catch (error) {
+      toast({
+        title: "Password Reset Failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -112,6 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginMutation,
         logoutMutation,
         registerMutation,
+        forgotPassword,
+        resetPassword,
       }}
     >
       {children}

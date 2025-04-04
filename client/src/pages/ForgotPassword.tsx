@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import MainLayout from "@/layouts/MainLayout";
 import { userPasswordResetSchema } from "@shared/schema";

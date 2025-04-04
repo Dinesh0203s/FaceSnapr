@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import { formatDate, DEFAULT_ERROR_MESSAGE } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/hooks/use-auth";
 import PhotoGrid, { Photo } from "@/components/PhotoGrid";
 import FaceRecognitionModal from "@/components/FaceRecognitionModal";
 import EventPinModal from "@/components/EventPinModal";
