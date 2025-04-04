@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import { formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Search, Plus, Eye, Edit, Trash2, Loader2 } from "lucide-react";
+import { Calendar, Search, Plus, Eye, Edit, Trash2, Loader2, Image as ImageIcon } from "lucide-react";
 
 export default function AdminEvents() {
   const { toast } = useToast();
@@ -42,6 +42,39 @@ export default function AdminEvents() {
   // Get all events
   const { data: events, isLoading } = useQuery({
     queryKey: ['/api/events'],
+  });
+
+  // Get photo counts
+  const eventIds = events?.map(event => event.id) || [];
+  const photoQueries = useQuery({
+    queryKey: ['photoCountsForEvents', eventIds],
+    enabled: eventIds.length > 0,
+    queryFn: async () => {
+      if (eventIds.length === 0) return {};
+      
+      // Create a map of event ID to photo count
+      const photoCounts = {};
+      
+      // For each event, fetch its photos and count them
+      await Promise.all(
+        eventIds.map(async (eventId) => {
+          try {
+            const response = await fetch(`/api/events/${eventId}/photos`);
+            if (response.ok) {
+              const photos = await response.json();
+              photoCounts[eventId] = photos.length;
+            } else {
+              photoCounts[eventId] = 0;
+            }
+          } catch (error) {
+            console.error(`Error fetching photos for event ${eventId}:`, error);
+            photoCounts[eventId] = 0;
+          }
+        })
+      );
+      
+      return photoCounts;
+    },
   });
 
   // Delete event mutation
@@ -145,7 +178,13 @@ export default function AdminEvents() {
                     <TableCell>{formatDate(event.date)}</TableCell>
                     <TableCell>{event.location || "-"}</TableCell>
                     <TableCell>{event.pin}</TableCell>
-                    <TableCell>0</TableCell> {/* This would come from an API call */}
+                    <TableCell>
+                      {photoQueries.data && photoQueries.data[event.id] !== undefined 
+                        ? photoQueries.data[event.id] 
+                        : photoQueries.isLoading 
+                          ? <Loader2 className="h-4 w-4 animate-spin" /> 
+                          : "0"}
+                    </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
                         <Button variant="ghost" size="icon" asChild>
@@ -156,6 +195,11 @@ export default function AdminEvents() {
                         <Button variant="ghost" size="icon" asChild>
                           <Link href={`/admin/events/edit/${event.id}`}>
                             <Edit className="h-4 w-4 text-primary" />
+                          </Link>
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild>
+                          <Link href={`/admin/events/${event.id}/photos`}>
+                            <ImageIcon className="h-4 w-4 text-blue-500" />
                           </Link>
                         </Button>
                         <Button 

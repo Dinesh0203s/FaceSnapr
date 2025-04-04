@@ -1,20 +1,23 @@
-import { useState } from 'react';
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
-  Download, 
+  DownloadCloud, 
   Share2, 
-  Maximize2, 
-  X 
-} from 'lucide-react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogTitle, 
-  DialogDescription 
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
-import { getImageUrl } from '@/lib/utils';
+  X, 
+  Loader2, 
+  ImageOff,
+  User,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { getImageUrl } from "@/lib/utils";
 
 export interface Photo {
   id: number;
@@ -31,90 +34,114 @@ interface PhotoGridProps {
 }
 
 export default function PhotoGrid({ photos, loading = false, showFaceIndicator = false }: PhotoGridProps) {
-  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const { toast } = useToast();
+  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
+  // Handle photo click to open modal
+  const handlePhotoClick = (photo: Photo) => {
+    setSelectedPhoto(photo);
+    setIsDialogOpen(true);
+  };
+
+  // Handle download button click
   const handleDownload = async (photo: Photo, e: React.MouseEvent) => {
     e.stopPropagation();
+    setLoadingAction("download");
     
     try {
       const response = await fetch(getImageUrl(photo.url));
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `photo-${photo.id}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      
-      // Clean up
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `photo-${photo.id}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       
       toast({
-        title: 'Download Started',
-        description: 'Your photo is being downloaded.',
+        title: "Download Started",
+        description: "Your photo download has started.",
       });
     } catch (error) {
       toast({
-        title: 'Download Failed',
-        description: 'There was an error downloading the photo. Please try again.',
-        variant: 'destructive',
+        title: "Download Failed",
+        description: "Failed to download the photo. Please try again.",
+        variant: "destructive",
       });
+    } finally {
+      setLoadingAction(null);
     }
   };
 
+  // Handle share button click
   const handleShare = (photo: Photo, e: React.MouseEvent) => {
     e.stopPropagation();
+    setLoadingAction("share");
     
-    // Check if Web Share API is supported
-    if (navigator.share) {
-      navigator.share({
-        title: 'Shared Photo from FaceFind',
-        text: 'Check out this photo from the event!',
-        url: window.location.href,
-      })
-      .then(() => {
-        toast({
-          title: 'Shared Successfully',
-          description: 'The photo has been shared.',
-        });
-      })
-      .catch((error) => {
-        console.error('Error sharing:', error);
-        toast({
-          title: 'Sharing Failed',
-          description: 'There was an error sharing the photo.',
-          variant: 'destructive',
-        });
-      });
-    } else {
-      // Fallback for browsers that don't support Web Share API
-      navigator.clipboard.writeText(window.location.href)
+    try {
+      if (navigator.share) {
+        navigator.share({
+          title: "Shared Photo",
+          text: "Check out this photo!",
+          url: getImageUrl(photo.url),
+        })
         .then(() => {
           toast({
-            title: 'Link Copied',
-            description: 'Photo link copied to clipboard.',
+            title: "Shared Successfully",
+            description: "The photo has been shared.",
           });
         })
-        .catch(() => {
+        .catch((error) => {
+          console.error("Error sharing:", error);
           toast({
-            title: 'Copy Failed',
-            description: 'Failed to copy link to clipboard.',
-            variant: 'destructive',
+            title: "Share Failed",
+            description: "Failed to share the photo.",
+            variant: "destructive",
           });
         });
+      } else {
+        // Fallback for browsers that don't support the Web Share API
+        navigator.clipboard.writeText(getImageUrl(photo.url))
+          .then(() => {
+            toast({
+              title: "Link Copied",
+              description: "Photo link copied to clipboard.",
+            });
+          })
+          .catch(() => {
+            toast({
+              title: "Copy Failed",
+              description: "Failed to copy the link to clipboard.",
+              variant: "destructive",
+            });
+          });
+      }
+    } catch (error) {
+      toast({
+        title: "Share Failed",
+        description: "Failed to share the photo.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingAction(null);
     }
   };
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="relative rounded-md overflow-hidden">
-            <Skeleton className="h-64 w-full" />
-          </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {[...Array(8)].map((_, index) => (
+          <Card key={index} className="overflow-hidden">
+            <div className="aspect-square bg-muted animate-pulse"></div>
+            <CardContent className="p-3">
+              <div className="h-4 bg-muted animate-pulse rounded-full w-2/3 mb-2"></div>
+              <div className="h-4 bg-muted animate-pulse rounded-full w-1/3"></div>
+            </CardContent>
+          </Card>
         ))}
       </div>
     );
@@ -122,15 +149,11 @@ export default function PhotoGrid({ photos, loading = false, showFaceIndicator =
 
   if (photos.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-center border-2 border-dashed border-border rounded-md">
-        <div className="rounded-full bg-primary/10 p-3 mb-4">
-          <svg className="h-6 w-6 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        </div>
-        <h3 className="text-lg font-medium text-foreground">No Photos Available</h3>
-        <p className="text-muted-foreground mt-2">
-          This event doesn't have any photos yet or you don't have access to them.
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <ImageOff className="h-12 w-12 text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium">No Photos Available</h3>
+        <p className="text-muted-foreground max-w-md mt-2">
+          There are no photos available for this event yet. Check back later or try another event.
         </p>
       </div>
     );
@@ -138,128 +161,122 @@ export default function PhotoGrid({ photos, loading = false, showFaceIndicator =
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {photos.map((photo) => (
-          <div 
+          <Card 
             key={photo.id} 
-            className="relative group rounded-md overflow-hidden cursor-pointer"
-            onClick={() => setSelectedPhoto(photo)}
+            className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => handlePhotoClick(photo)}
           >
-            {showFaceIndicator && photo.faceData && (
-              <div className="absolute top-2 right-2 z-10">
-                <div 
-                  className="bg-primary rounded-full p-1 text-white shadow-md" 
-                  title="Face detected"
-                >
-                  <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+            <div className="relative aspect-square">
+              <img
+                src={getImageUrl(photo.url)}
+                alt={`Photo ${photo.id}`}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+              
+              {/* Face indicator icon */}
+              {showFaceIndicator && photo.faceData && (
+                <div className="absolute top-2 right-2 bg-primary text-white rounded-full p-1 shadow-md">
+                  <User className="h-4 w-4" />
                 </div>
-              </div>
-            )}
-            
-            <img 
-              src={getImageUrl(photo.url)} 
-              alt="Event photo" 
-              className="w-full h-auto object-cover aspect-[4/3]"
-              loading="lazy"
-            />
-            
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-            
-            <div className="absolute bottom-0 left-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <div className="flex justify-between items-center">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="text-white hover:text-primary bg-black/20 rounded-full"
+              )}
+              
+              {/* Action buttons */}
+              <div className="absolute bottom-2 right-2 flex space-x-1">
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className="h-8 w-8 rounded-full opacity-90"
                   onClick={(e) => handleDownload(photo, e)}
+                  disabled={loadingAction === "download"}
                 >
-                  <Download className="h-4 w-4" />
-                  <span className="sr-only">Download</span>
+                  {loadingAction === "download" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <DownloadCloud className="h-4 w-4" />
+                  )}
                 </Button>
-                <div className="flex space-x-1">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-white hover:text-primary bg-black/20 rounded-full"
-                    onClick={(e) => handleShare(photo, e)}
-                  >
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className="h-8 w-8 rounded-full opacity-90"
+                  onClick={(e) => handleShare(photo, e)}
+                  disabled={loadingAction === "share"}
+                >
+                  {loadingAction === "share" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
                     <Share2 className="h-4 w-4" />
-                    <span className="sr-only">Share</span>
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-white hover:text-primary bg-black/20 rounded-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedPhoto(photo);
-                    }}
-                  >
-                    <Maximize2 className="h-4 w-4" />
-                    <span className="sr-only">Fullscreen</span>
-                  </Button>
-                </div>
+                  )}
+                </Button>
               </div>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
       
-      {/* Photo modal */}
-      <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
-        <DialogContent className="max-w-5xl w-full p-1 sm:p-2 md:p-6 bg-background/95 backdrop-blur-sm">
-          <div className="absolute right-2 top-2 z-10">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 rounded-full"
-              onClick={() => setSelectedPhoto(null)}
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-            </Button>
-          </div>
-          
-          {selectedPhoto && (
-            <div className="flex items-center justify-center">
-              <img 
-                src={getImageUrl(selectedPhoto.url)} 
-                alt="Full size event photo" 
-                className="max-h-[80vh] w-auto object-contain"
+      {/* Full-size photo dialog */}
+      {selectedPhoto && (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Photo #{selectedPhoto.id}</DialogTitle>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="absolute right-4 top-4"
+                onClick={() => setIsDialogOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogHeader>
+            <div className="relative">
+              <img
+                src={getImageUrl(selectedPhoto.url)}
+                alt={`Photo ${selectedPhoto.id}`}
+                className="w-full object-contain max-h-[70vh]"
               />
             </div>
-          )}
-          
-          {selectedPhoto && (
-            <div className="flex justify-between items-center mt-2">
-              <div className="text-xs text-muted-foreground">
-                Photo #{selectedPhoto.id}
-              </div>
-              <div className="flex space-x-2">
-                <Button 
-                  size="sm"
+            <DialogFooter>
+              <div className="flex justify-between w-full">
+                <Button
                   variant="outline"
-                  className="flex items-center space-x-1"
-                  onClick={(e) => handleShare(selectedPhoto, e)}
+                  onClick={() => setIsDialogOpen(false)}
                 >
-                  <Share2 className="h-4 w-4 mr-1" />
-                  Share
+                  Close
                 </Button>
-                <Button 
-                  size="sm"
-                  className="flex items-center space-x-1"
-                  onClick={(e) => handleDownload(selectedPhoto, e)}
-                >
-                  <Download className="h-4 w-4 mr-1" />
-                  Download
-                </Button>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={(e) => handleShare(selectedPhoto, e)}
+                    disabled={loadingAction === "share"}
+                  >
+                    {loadingAction === "share" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Share2 className="mr-2 h-4 w-4" />
+                    )}
+                    Share
+                  </Button>
+                  <Button
+                    onClick={(e) => handleDownload(selectedPhoto, e)}
+                    disabled={loadingAction === "download"}
+                  >
+                    {loadingAction === "download" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <DownloadCloud className="mr-2 h-4 w-4" />
+                    )}
+                    Download
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

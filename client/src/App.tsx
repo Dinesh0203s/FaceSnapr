@@ -16,6 +16,8 @@ import UserProfile from "@/pages/UserProfile";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminEvents from "@/pages/AdminEvents";
 import AdminAddEvent from "@/pages/AdminAddEvent";
+import AdminEditEvent from "@/pages/AdminEditEvent";
+import AdminEventPhotos from "@/pages/AdminEventPhotos";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -61,7 +63,20 @@ function Router() {
           </ProtectedRoute>
         )}
       </Route>
-      {/* Remove admin edit event and admin photos routes until implemented */}
+      <Route path="/admin/events/edit/:id">
+        {params => (
+          <ProtectedRoute adminOnly>
+            <AdminEditEvent id={parseInt(params.id)} />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/admin/events/:id/photos">
+        {params => (
+          <ProtectedRoute adminOnly>
+            <AdminEventPhotos id={parseInt(params.id)} />
+          </ProtectedRoute>
+        )}
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

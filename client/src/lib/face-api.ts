@@ -1,17 +1,20 @@
 import * as faceapi from 'face-api.js';
 
+// Track whether models have been loaded
 let modelsLoaded = false;
 
-// Initialize face-api.js models
+// Load face-api.js models
 export async function initFaceApi() {
   if (modelsLoaded) return;
   
   try {
+    // Load models from public directory
     await Promise.all([
       faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
       faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
       faceapi.nets.faceRecognitionNet.loadFromUri('/models')
     ]);
+    
     modelsLoaded = true;
     console.log('Face-api models loaded successfully');
   } catch (error) {
@@ -20,44 +23,66 @@ export async function initFaceApi() {
   }
 }
 
-// Detect faces in an image element
+// Detect faces in an image
 export async function detectFaces(imgElement: HTMLImageElement) {
   await initFaceApi();
   
-  return faceapi.detectAllFaces(imgElement)
-    .withFaceLandmarks()
-    .withFaceDescriptors();
+  try {
+    // Detect faces with landmarks and descriptor
+    const detections = await faceapi
+      .detectAllFaces(imgElement)
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+    
+    return detections;
+  } catch (error) {
+    console.error('Error detecting faces:', error);
+    throw new Error('Face detection failed');
+  }
 }
 
-// Process image file for face detection
+// Process an image for face recognition and return face descriptors
 export async function processFaceImage(file: File): Promise<{ success: boolean, message?: string, faceDescriptors?: Float32Array[] }> {
   try {
     await initFaceApi();
     
-    // Create an image element from the file
+    // Create img element from file
     const img = await createImageFromFile(file);
     
     // Detect faces
-    const detections = await faceapi.detectAllFaces(img)
+    const detections = await faceapi
+      .detectAllFaces(img)
       .withFaceLandmarks()
       .withFaceDescriptors();
     
+    // If no faces detected
     if (detections.length === 0) {
       return { 
         success: false, 
-        message: 'No faces detected in the image. Please upload a clear photo of your face.' 
+        message: "No faces detected in the image. Please try a different photo." 
       };
     }
     
+    // If too many faces detected
+    if (detections.length > 1) {
+      return { 
+        success: false, 
+        message: "Multiple faces detected. Please use a photo with only your face." 
+      };
+    }
+    
+    // Extract face descriptors (features that identify the face)
+    const faceDescriptors = detections.map(d => d.descriptor);
+    
     return {
       success: true,
-      faceDescriptors: detections.map(d => d.descriptor)
+      faceDescriptors
     };
   } catch (error) {
     console.error('Error processing face image:', error);
     return {
       success: false,
-      message: 'Failed to process the image. Please try again with a different photo.'
+      message: error instanceof Error ? error.message : 'Face processing failed'
     };
   }
 }
@@ -66,38 +91,47 @@ export async function processFaceImage(file: File): Promise<{ success: boolean, 
 function createImageFromFile(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    const url = URL.createObjectURL(file);
+    const objectUrl = URL.createObjectURL(file);
     
     img.onload = () => {
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(objectUrl);
       resolve(img);
     };
     
-    img.onerror = (err) => {
-      URL.revokeObjectURL(url);
-      reject(err);
+    img.onerror = (error) => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load image'));
     };
     
-    img.src = url;
+    img.src = objectUrl;
   });
 }
 
-// Draw face detections on a canvas
-export function drawFaceDetections(canvas: HTMLCanvasElement, imgElement: HTMLImageElement, detections: faceapi.WithFaceDescriptor<faceapi.WithFaceLandmarks<faceapi.DetectionWithLandmarks>> | faceapi.WithFaceDescriptor<faceapi.WithFaceLandmarks<faceapi.DetectionWithLandmarks>>[]) {
-  // Resize canvas to match image dimensions
-  const displaySize = { width: imgElement.width, height: imgElement.height };
-  faceapi.matchDimensions(canvas, displaySize);
+// Draw face detection results on canvas
+export function drawFaceDetections(
+  canvas: HTMLCanvasElement, 
+  imgElement: HTMLImageElement, 
+  detections: faceapi.WithFaceDescriptor<faceapi.WithFaceLandmarks<faceapi.DetectionWithLandmarks>> | faceapi.WithFaceDescriptor<faceapi.WithFaceLandmarks<faceapi.DetectionWithLandmarks>>[]
+) {
+  // Resize canvas to match image
+  canvas.width = imgElement.width;
+  canvas.height = imgElement.height;
   
-  // Draw detections
-  const resizedDetections = Array.isArray(detections) 
-    ? detections.map(d => faceapi.resizeResults(d, displaySize)) 
-    : [faceapi.resizeResults(detections, displaySize)];
-  
-  // Clear previous drawings
+  // Clear canvas
   const ctx = canvas.getContext('2d');
-  if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (ctx) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
   
-  // Draw each detection
-  faceapi.draw.drawDetections(canvas, resizedDetections);
-  faceapi.draw.drawFaceLandmarks(canvas, resizedDetections);
+  // Draw image
+  faceapi.draw.drawImage(canvas, imgElement);
+  
+  // Draw face detections
+  if (Array.isArray(detections)) {
+    faceapi.draw.drawDetections(canvas, detections);
+    faceapi.draw.drawFaceLandmarks(canvas, detections);
+  } else {
+    faceapi.draw.drawDetections(canvas, [detections]);
+    faceapi.draw.drawFaceLandmarks(canvas, [detections]);
+  }
 }

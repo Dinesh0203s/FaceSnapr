@@ -89,8 +89,12 @@ export class MemStorage implements IStorage {
     const id = this.userIdCounter++;
     const now = new Date();
     const user: User = { 
-      ...insertUser, 
       id,
+      username: insertUser.username,
+      email: insertUser.email,
+      password: insertUser.password,
+      name: insertUser.name ?? null,
+      isAdmin: insertUser.isAdmin ?? false,
       createdAt: now,
       resetToken: null,
       resetTokenExpiry: null
@@ -128,8 +132,13 @@ export class MemStorage implements IStorage {
     const id = this.eventIdCounter++;
     const now = new Date();
     const event: Event = { 
-      ...insertEvent, 
       id,
+      name: insertEvent.name,
+      description: insertEvent.description ?? null,
+      date: insertEvent.date,
+      location: insertEvent.location ?? null,
+      pin: insertEvent.pin,
+      createdBy: insertEvent.createdBy,
       createdAt: now
     };
     this.events.set(id, event);
@@ -165,8 +174,10 @@ export class MemStorage implements IStorage {
     const id = this.photoIdCounter++;
     const now = new Date();
     const photo: Photo = { 
-      ...insertPhoto, 
       id,
+      eventId: insertPhoto.eventId,
+      url: insertPhoto.url,
+      faceData: insertPhoto.faceData ?? null,
       uploadedAt: now
     };
     this.photos.set(id, photo);
@@ -198,8 +209,10 @@ export class MemStorage implements IStorage {
     const id = this.photoHistoryIdCounter++;
     const now = new Date();
     const history: PhotoHistory = { 
-      ...insertHistory, 
       id,
+      userId: insertHistory.userId,
+      photoId: insertHistory.photoId,
+      eventId: insertHistory.eventId,
       viewedAt: now
     };
     this.photoHistory.set(id, history);
@@ -272,7 +285,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEvent(id: number): Promise<boolean> {
     const result = await db.delete(events).where(eq(events.id, id));
-    return result.rowCount > 0;
+    return result.rowCount !== null && result.rowCount > 0;
   }
 
   // Photo operations
@@ -305,7 +318,7 @@ export class DatabaseStorage implements IStorage {
 
   async deletePhoto(id: number): Promise<boolean> {
     const result = await db.delete(photos).where(eq(photos.id, id));
-    return result.rowCount > 0;
+    return result.rowCount !== null && result.rowCount > 0;
   }
 
   // Photo history operations
@@ -318,8 +331,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPhotoHistory(insertHistory: InsertPhotoHistory): Promise<PhotoHistory> {
-    const [history] = await db.insert(photoHistory).values(insertHistory).returning();
-    return history;
+    try {
+      const [history] = await db.insert(photoHistory).values(insertHistory).returning();
+      return history;
+    } catch (error) {
+      console.error("Error creating photo history:", error);
+      throw error;
+    }
   }
 }
 

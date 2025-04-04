@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import PhotoGrid, { Photo } from "@/components/PhotoGrid";
 import FaceRecognitionModal from "@/components/FaceRecognitionModal";
+import EventPinModal from "@/components/EventPinModal";
 import { Loader2, Search, Map, Calendar, Camera, Users, Info } from "lucide-react";
 
 interface EventDetailProps {
@@ -17,24 +18,52 @@ interface EventDetailProps {
 }
 
 export default function EventDetail({ id }: EventDetailProps) {
+  const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [faceModalOpen, setFaceModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isFaceModalOpen, setIsFaceModalOpen] = useState(false);
   const [matchingPhotos, setMatchingPhotos] = useState<Photo[] | null>(null);
 
-  // Get event details
-  const { data: event, isLoading: eventLoading, error: eventError } = useQuery({
+  // Get event data
+  const {
+    data: event,
+    isLoading: eventLoading,
+    isError: eventError,
+  } = useQuery({
     queryKey: [`/api/events/${id}`],
-    enabled: isAuthenticated && !!id,
+    onError: (error) => {
+      toast({
+        title: "Error Loading Event",
+        description: error instanceof Error ? error.message : DEFAULT_ERROR_MESSAGE,
+        variant: "destructive"
+      });
+    }
   });
 
   // Get event photos
-  const { data: photos, isLoading: photosLoading, error: photosError } = useQuery({
+  const {
+    data: photos,
+    isLoading: photosLoading,
+    isError: photosError,
+    refetch: refetchPhotos,
+  } = useQuery({
     queryKey: [`/api/events/${id}/photos`],
-    enabled: isAuthenticated && !!id && !eventError,
+    enabled: Boolean(event),
+    onError: (error) => {
+      // Check if error is due to PIN requirement
+      if (error instanceof Error && error.message.includes("PIN")) {
+        setIsPinModalOpen(true);
+      } else {
+        toast({
+          title: "Error Loading Photos",
+          description: error instanceof Error ? error.message : DEFAULT_ERROR_MESSAGE,
+          variant: "destructive"
+        });
+      }
+    }
   });
 
   // Face recognition mutation
@@ -42,18 +71,17 @@ export default function EventDetail({ id }: EventDetailProps) {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('selfie', file);
-
+      
       const response = await fetch(`/api/events/${id}/face-recognition`, {
         method: 'POST',
         body: formData,
-        credentials: 'include',
       });
-
+      
       if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || response.statusText);
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Face recognition failed');
       }
-
+      
       return response.json();
     },
     onSuccess: (data) => {
@@ -108,14 +136,15 @@ export default function EventDetail({ id }: EventDetailProps) {
   if (eventError || !event) {
     return (
       <MainLayout>
-        <div className="max-w-3xl mx-auto px-4 py-12 text-center">
-          <h1 className="text-2xl font-bold mb-4">Event Not Found</h1>
-          <p className="text-muted-foreground mb-6">
-            The event you're looking for doesn't exist or you don't have access to it.
-          </p>
-          <Button onClick={() => navigate('/events')}>
-            Back to Events
-          </Button>
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="text-center py-12 space-y-4">
+            <Info className="h-12 w-12 text-muted-foreground mx-auto" />
+            <h1 className="text-2xl font-bold">Event Not Found</h1>
+            <p className="text-muted-foreground">
+              The event you're looking for doesn't exist or you don't have permission to view it.
+            </p>
+            <Button onClick={() => navigate('/events')}>Back to Events</Button>
+          </div>
         </div>
       </MainLayout>
     );
@@ -123,148 +152,85 @@ export default function EventDetail({ id }: EventDetailProps) {
 
   return (
     <MainLayout>
-      <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* Photo Grid */}
-          <div className="w-full md:w-3/4">
-            <div className="bg-card rounded-lg shadow p-6">
-              <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-                <h1 className="text-2xl font-bold text-foreground">{event.name}</h1>
-                <div className="flex space-x-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                    <Input 
-                      type="text" 
-                      placeholder="Search photos..." 
-                      className="w-full md:w-52 pl-9"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    onClick={() => setFaceModalOpen(true)}
-                    disabled={faceMutation.isPending}
-                    className="flex items-center"
-                  >
-                    {faceMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Camera className="mr-2 h-4 w-4" />
-                    )}
-                    Find My Photos
-                  </Button>
-                </div>
+      <div className="container max-w-6xl py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">{event.name}</h1>
+          <div className="flex flex-wrap gap-4 items-center text-sm text-muted-foreground mb-4">
+            <div className="flex items-center">
+              <Calendar className="mr-1 h-4 w-4" />
+              {formatDate(event.date)}
+            </div>
+            {event.location && (
+              <div className="flex items-center">
+                <Map className="mr-1 h-4 w-4" />
+                {event.location}
               </div>
-              
-              {matchingPhotos && (
-                <div className="mb-4 p-3 bg-primary/10 rounded-md text-primary">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Info className="h-5 w-5 mr-2" />
-                      <span>Showing {matchingPhotos.length} photos with your face</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setMatchingPhotos(null)}
-                    >
-                      Show All Photos
-                    </Button>
-                  </div>
-                </div>
-              )}
-              
-              <PhotoGrid 
-                photos={filteredPhotos || []} 
-                loading={photosLoading}
-                showFaceIndicator
+            )}
+          </div>
+          {event.description && (
+            <p className="text-muted-foreground mb-6 max-w-3xl">{event.description}</p>
+          )}
+          
+          <div className="flex flex-col sm:flex-row gap-4 mb-8">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search photos..."
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-          </div>
-          
-          {/* Sidebar with Event Info */}
-          <div className="w-full md:w-1/4">
-            <div className="bg-card rounded-lg shadow p-6 sticky top-4">
-              <h2 className="text-xl font-bold text-foreground mb-4">Event Details</h2>
-              <div className="space-y-4">
-                <div className="flex items-start">
-                  <Calendar className="h-5 w-5 text-primary mr-3 mt-0.5" />
-                  <div>
-                    <h3 className="text-sm text-muted-foreground">Event Date</h3>
-                    <p className="text-foreground">{formatDate(event.date)}</p>
-                  </div>
-                </div>
-                
-                {event.location && (
-                  <div className="flex items-start">
-                    <Map className="h-5 w-5 text-primary mr-3 mt-0.5" />
-                    <div>
-                      <h3 className="text-sm text-muted-foreground">Location</h3>
-                      <p className="text-foreground">{event.location}</p>
-                    </div>
-                  </div>
+            
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 sm:flex-none"
+                onClick={() => setIsFaceModalOpen(true)}
+                disabled={faceMutation.isPending}
+              >
+                {faceMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Camera className="mr-2 h-4 w-4" />
                 )}
-                
-                <div className="flex items-start">
-                  <Camera className="h-5 w-5 text-primary mr-3 mt-0.5" />
-                  <div>
-                    <h3 className="text-sm text-muted-foreground">Photos</h3>
-                    <p className="text-foreground">{photos ? photos.length : 0} photos</p>
-                  </div>
-                </div>
-                
-                {event.description && (
-                  <div className="flex items-start">
-                    <Info className="h-5 w-5 text-primary mr-3 mt-0.5" />
-                    <div>
-                      <h3 className="text-sm text-muted-foreground">Description</h3>
-                      <p className="text-foreground text-sm">{event.description}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+                Find Photos of Me
+              </Button>
               
-              <div className="mt-6 pt-6 border-t border-border">
-                <Button
-                  className="w-full mb-3"
-                  onClick={() => setFaceModalOpen(true)}
-                  disabled={faceMutation.isPending}
+              {matchingPhotos && (
+                <Button 
+                  variant="ghost"
+                  onClick={() => setMatchingPhotos(null)}
                 >
-                  {faceMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Camera className="mr-2 h-4 w-4" />
-                  )}
-                  Find My Photos
+                  <Users className="mr-2 h-4 w-4" />
+                  Show All Photos
                 </Button>
-                
-                {photos && photos.length > 0 && (
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      toast({
-                        title: "Feature Coming Soon",
-                        description: "Download functionality will be available in a future update.",
-                      });
-                    }}
-                  >
-                    <svg className="h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Download All
-                  </Button>
-                )}
-              </div>
+              )}
             </div>
           </div>
         </div>
+        
+        <PhotoGrid 
+          photos={filteredPhotos || []} 
+          loading={photosLoading} 
+          showFaceIndicator={Boolean(matchingPhotos)}
+        />
       </div>
+      
+      <EventPinModal
+        eventId={id}
+        eventName={event.name}
+        isOpen={isPinModalOpen}
+        onClose={() => {
+          setIsPinModalOpen(false);
+          refetchPhotos();
+        }}
+      />
       
       <FaceRecognitionModal
         eventId={id}
-        isOpen={faceModalOpen}
-        onClose={() => setFaceModalOpen(false)}
+        isOpen={isFaceModalOpen}
+        onClose={() => setIsFaceModalOpen(false)}
         onFaceDetected={handleFaceRecognition}
       />
     </MainLayout>

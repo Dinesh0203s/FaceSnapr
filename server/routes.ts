@@ -560,27 +560,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const photoHistoryRecords = await storage.getPhotoHistory(user.id);
       
-      // Get the actual photos
-      const photos = [];
+      // Get the actual photos and events
+      const enrichedHistory = [];
       
       for (const record of photoHistoryRecords) {
         const photo = await storage.getPhoto(record.photoId);
         const event = await storage.getEvent(record.eventId);
         
         if (photo && event) {
-          photos.push({
-            ...photo,
+          enrichedHistory.push({
+            id: record.id,
+            userId: record.userId,
+            photoId: record.photoId,
+            eventId: record.eventId,
+            viewedAt: record.viewedAt,
+            createdAt: record.viewedAt, // Use viewedAt for createdAt
+            photo: photo,
             event: {
               id: event.id,
               name: event.name,
-              date: event.date
-            },
-            viewedAt: record.viewedAt
+              date: event.date,
+              location: event.location
+            }
           });
         }
       }
       
-      res.json(photos);
+      res.json(enrichedHistory);
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Failed to fetch photo history' });

@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { useLocation } from 'wouter';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { 
   Dialog, 
   DialogContent, 
@@ -8,12 +10,27 @@ import {
   DialogHeader, 
   DialogTitle 
 } from '@/components/ui/dialog';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Key, LockKeyhole } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
+
+// Form schema
+const pinSchema = z.object({
+  pin: z.string().min(4, "PIN must be at least 4 characters").max(10, "PIN cannot exceed 10 characters"),
+});
+
+type PinFormValues = z.infer<typeof pinSchema>;
 
 interface EventPinModalProps {
   eventId: number;
@@ -23,101 +40,127 @@ interface EventPinModalProps {
 }
 
 export default function EventPinModal({ eventId, eventName, isOpen, onClose }: EventPinModalProps) {
-  const [pin, setPin] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [isVerified, setIsVerified] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!pin.trim()) {
-      setError('Please enter the event PIN');
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
-    
-    try {
-      await apiRequest('POST', '/api/events/access', { eventId, pin });
-      
+  // Create form
+  const form = useForm<PinFormValues>({
+    resolver: zodResolver(pinSchema),
+    defaultValues: {
+      pin: "",
+    },
+  });
+
+  // PIN verification mutation
+  const pinMutation = useMutation({
+    mutationFn: async (data: PinFormValues) => {
+      return apiRequest('POST', '/api/events/access', { 
+        eventId, 
+        pin: data.pin 
+      });
+    },
+    onSuccess: () => {
+      setIsVerified(true);
       toast({
-        title: 'Access Granted',
-        description: 'You now have access to this event\'s photos.',
+        title: "Access Granted",
+        description: "You now have access to view the event photos.",
       });
       
-      onClose();
-      setLocation(`/events/${eventId}`);
-    } catch (err) {
-      let message = 'Invalid PIN. Please try again.';
-      
-      if (err instanceof Error) {
-        message = err.message;
-      }
-      
-      setError(message);
+      // Close modal and reload page after a short delay
+      setTimeout(() => {
+        onClose();
+        // We don't use window.location.reload() here to avoid a full page reload
+        // The parent component should handle refreshing the data
+      }, 1500);
+    },
+    onError: (error) => {
       toast({
-        title: 'Access Denied',
-        description: message,
-        variant: 'destructive',
+        title: "Access Denied",
+        description: error instanceof Error 
+          ? error.message 
+          : "The PIN you entered is incorrect. Please try again.",
+        variant: "destructive",
       });
-    } finally {
-      setLoading(false);
-    }
+    },
+  });
+
+  // Form submission
+  const onSubmit = (data: PinFormValues) => {
+    pinMutation.mutate(data);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {
-      if (!loading) onClose();
-    }}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Enter Event PIN</DialogTitle>
           <DialogDescription>
-            Please enter the secret PIN to access photos from "{eventName}".
+            This event requires a PIN for access. Please enter the PIN provided by the event organizer.
           </DialogDescription>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit}>
-          <div className="my-6">
-            <Label htmlFor="event-pin" className="block text-sm font-medium mb-1">
-              Event PIN
-            </Label>
-            <Input
-              id="event-pin"
-              type="password"
-              placeholder="Enter PIN"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
-              className={error ? 'border-destructive' : ''}
-              disabled={loading}
-              autoFocus
-            />
-            {error && (
-              <p className="mt-1 text-sm text-destructive">{error}</p>
-            )}
-          </div>
-          
-          <DialogFooter className="flex space-x-2 sm:space-x-0">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={onClose}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit"
-              disabled={loading}
-            >
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Submit
-            </Button>
-          </DialogFooter>
-        </form>
+        <div className="py-4">
+          {isVerified ? (
+            <div className="flex flex-col items-center justify-center py-4 space-y-4">
+              <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center text-green-600 dark:bg-green-900/20">
+                <LockKeyhole className="h-8 w-8" />
+              </div>
+              <p className="text-center font-medium">Access granted to "{eventName}"</p>
+              <p className="text-sm text-muted-foreground text-center">
+                You can now view all photos from this event.
+              </p>
+            </div>
+          ) : (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="pin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Event PIN</FormLabel>
+                      <FormControl>
+                        <div className="flex space-x-2">
+                          <div className="relative flex-1">
+                            <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              {...field}
+                              placeholder="Enter PIN"
+                              className="pl-9"
+                              type="text"
+                              autoComplete="off"
+                            />
+                          </div>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <DialogFooter className="sm:justify-between px-0 pb-0">
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    onClick={onClose}
+                    disabled={pinMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit"
+                    disabled={pinMutation.isPending}
+                  >
+                    {pinMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Verify PIN
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

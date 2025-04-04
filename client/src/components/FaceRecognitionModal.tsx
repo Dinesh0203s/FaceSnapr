@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -26,213 +26,312 @@ export default function FaceRecognitionModal({
   onClose,
   onFaceDetected
 }: FaceRecognitionModalProps) {
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
+  // Handle file upload
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
     
-    if (!isValidImage(selectedFile)) {
-      setError('Please upload a valid image file (JPG, JPEG, or PNG)');
+    if (!isValidImage(file)) {
+      toast({
+        title: "Invalid File",
+        description: "Please select a valid image file (JPEG, PNG, or GIF).",
+        variant: "destructive",
+      });
       return;
     }
     
-    setFile(selectedFile);
-    setPreviewUrl(URL.createObjectURL(selectedFile));
-    setError(null);
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const droppedFile = e.dataTransfer.files[0];
-      
-      if (!isValidImage(droppedFile)) {
-        setError('Please upload a valid image file (JPG, JPEG, or PNG)');
-        return;
-      }
-      
-      setFile(droppedFile);
-      setPreviewUrl(URL.createObjectURL(droppedFile));
-      setError(null);
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
-  const resetFile = () => {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-    setFile(null);
-    setPreviewUrl(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!file) {
-      setError('Please upload a selfie first');
-      return;
-    }
-    
-    setLoading(true);
-    setError(null);
+    setIsLoading(true);
     
     try {
-      // Check if face is detected in the image
-      const result = await processFaceImage(file);
+      // Process the image with face-api.js
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
       
-      if (!result.success) {
-        setError(result.message || 'Failed to detect face. Please try another photo.');
-        return;
-      }
+      img.onload = async () => {
+        try {
+          const result = await processFaceImage(file);
+          
+          if (result.success) {
+            onFaceDetected(file);
+            onClose();
+          } else {
+            toast({
+              title: "Face Detection Failed",
+              description: result.message || "No face detected in the image. Please try another photo.",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          toast({
+            title: "Processing Error",
+            description: error instanceof Error ? error.message : "Failed to process the image. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoading(false);
+          URL.revokeObjectURL(objectUrl);
+        }
+      };
       
-      // Pass the file to the parent component
-      onFaceDetected(file);
+      img.onerror = () => {
+        setIsLoading(false);
+        URL.revokeObjectURL(objectUrl);
+        toast({
+          title: "Image Error",
+          description: "Failed to load the image. Please try another file.",
+          variant: "destructive",
+        });
+      };
       
-      // Close the modal
-      onClose();
-      
+      img.src = objectUrl;
+    } catch (error) {
+      setIsLoading(false);
       toast({
-        title: 'Face Detected',
-        description: 'Your face is being analyzed to find matching photos.',
+        title: "Processing Error",
+        description: error instanceof Error ? error.message : "Failed to process the image. Please try again.",
+        variant: "destructive",
       });
-    } catch (err) {
-      console.error('Face detection error:', err);
-      let message = 'Failed to process image. Please try another photo.';
-      
-      if (err instanceof Error) {
-        message = err.message;
-      }
-      
-      setError(message);
-      
-      toast({
-        title: 'Face Detection Failed',
-        description: message,
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+    }
+    
+    // Reset the input
+    if (e.target.value) {
+      e.target.value = '';
     }
   };
 
-  const handleClose = () => {
-    if (!loading) {
-      resetFile();
-      onClose();
+  // Handle starting the camera
+  const startCamera = useCallback(async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera not supported on this device or browser");
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: "user"
+        } 
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+        setCameraActive(true);
+      }
+    } catch (error) {
+      console.error('Error accessing the camera:', error);
+      toast({
+        title: "Camera Error",
+        description: error instanceof Error 
+          ? error.message 
+          : "Failed to access the camera. Please ensure you've granted camera permissions.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  // Handle stopping the camera
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    
+    setCameraActive(false);
+  }, []);
+
+  // Clean up on close
+  const handleDialogClose = () => {
+    stopCamera();
+    onClose();
+  };
+
+  // Take a photo from the camera
+  const takePhoto = async () => {
+    if (!videoRef.current || !canvasRef.current || !streamRef.current) return;
+    
+    setIsLoading(true);
+    
+    try {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      
+      // Set canvas size to match video dimensions
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Draw the current video frame to the canvas
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert canvas to blob
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            // Create a file from the blob
+            const file = new File([blob], `selfie-${Date.now()}.jpg`, { type: 'image/jpeg' });
+            
+            try {
+              // Process image with face-api
+              const result = await processFaceImage(file);
+              
+              if (result.success) {
+                stopCamera();
+                onFaceDetected(file);
+                onClose();
+              } else {
+                toast({
+                  title: "Face Detection Failed",
+                  description: result.message || "No face detected in the image. Please try again or upload a photo.",
+                  variant: "destructive",
+                });
+              }
+            } catch (error) {
+              toast({
+                title: "Processing Error",
+                description: error instanceof Error ? error.message : "Failed to process the image. Please try again.",
+                variant: "destructive",
+              });
+            }
+          } else {
+            toast({
+              title: "Capture Failed",
+              description: "Failed to capture photo. Please try again.",
+              variant: "destructive",
+            });
+          }
+          setIsLoading(false);
+        }, 'image/jpeg', 0.9);
+      }
+    } catch (error) {
+      setIsLoading(false);
+      toast({
+        title: "Camera Error",
+        description: error instanceof Error ? error.message : "Failed to capture photo. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={handleDialogClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Face Recognition</DialogTitle>
+          <DialogTitle>Scan Your Face</DialogTitle>
           <DialogDescription>
-            Upload a selfie to find photos of you in this event.
+            Take a selfie or upload a photo of yourself to find photos you appear in.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="my-6">
-          {!previewUrl ? (
-            <div 
-              className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary transition-colors"
-              onClick={triggerFileInput}
-              onDragOver={handleDragOver}
-              onDrop={handleDrop}
-            >
-              <div className="flex flex-col items-center">
-                <Camera className="h-12 w-12 text-muted-foreground mb-2" />
-                <p className="text-muted-foreground mb-2">
-                  Click to upload a selfie<br />or drag and drop
-                </p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  accept="image/jpeg,image/jpg,image/png"
-                  onChange={handleFileChange}
-                />
-                <Button 
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="mt-2"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    triggerFileInput();
-                  }}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Select File
-                </Button>
-              </div>
+        <div className="space-y-4">
+          {cameraActive ? (
+            <div className="relative overflow-hidden rounded-lg border bg-background">
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                className="w-full h-64 object-cover"
+              />
+              <canvas ref={canvasRef} className="hidden" />
             </div>
           ) : (
-            <div className="text-center">
-              <div className="relative mx-auto max-h-48 max-w-full">
-                <img 
-                  src={previewUrl} 
-                  alt="Selfie preview" 
-                  className="max-h-48 mx-auto rounded-md object-contain"
-                />
+            <div className="flex flex-col items-center justify-center h-64 border rounded-lg bg-muted/20">
+              <div className="flex space-x-2 mb-4">
+                <Camera className="h-8 w-8 text-muted-foreground" />
+                <ImageIcon className="h-8 w-8 text-muted-foreground" />
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-4"
-                onClick={resetFile}
-                disabled={loading}
-              >
-                <ImageIcon className="h-4 w-4 mr-2" />
-                Change photo
-              </Button>
+              <p className="text-sm text-muted-foreground text-center max-w-xs">
+                Use your webcam to take a selfie or upload a photo to find all pictures you appear in.
+              </p>
             </div>
           )}
           
-          {error && (
-            <p className="mt-2 text-sm text-destructive text-center">{error}</p>
-          )}
-        </div>
-        
-        <DialogFooter className="flex space-x-2 sm:space-x-0">
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={handleClose}
-            disabled={loading}
-          >
-            Cancel
-          </Button>
-          <Button 
-            type="button"
-            disabled={!file || loading}
-            onClick={handleSubmit}
-          >
-            {loading ? (
+          <div className="flex flex-col sm:flex-row gap-2">
+            {cameraActive ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
+                <Button 
+                  type="button" 
+                  variant="secondary" 
+                  className="flex-1"
+                  onClick={stopCamera}
+                  disabled={isLoading}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="button" 
+                  className="flex-1"
+                  onClick={takePhoto}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Camera className="mr-2 h-4 w-4" />
+                  )}
+                  Take Photo
+                </Button>
               </>
             ) : (
-              'Find Photos'
+              <>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="mr-2 h-4 w-4" />
+                  )}
+                  Upload Photo
+                </Button>
+                <Button 
+                  type="button" 
+                  className="flex-1"
+                  onClick={startCamera}
+                  disabled={isLoading}
+                >
+                  <Camera className="mr-2 h-4 w-4" />
+                  Use Camera
+                </Button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  disabled={isLoading}
+                />
+              </>
             )}
+          </div>
+        </div>
+        
+        <DialogFooter className="flex flex-col sm:flex-row sm:justify-between sm:space-x-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleDialogClose}
+            disabled={isLoading}
+            className="mt-2 sm:mt-0"
+          >
+            Cancel
           </Button>
         </DialogFooter>
       </DialogContent>
