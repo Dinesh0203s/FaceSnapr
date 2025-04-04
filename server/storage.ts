@@ -4,6 +4,8 @@ import {
   photos, type Photo, type InsertPhoto,
   photoHistory, type PhotoHistory, type InsertPhotoHistory
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 // Interface for all storage operations
 export interface IStorage {
@@ -205,4 +207,121 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  // User operations
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(insertUser).returning();
+    return user;
+  }
+
+  async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser;
+  }
+
+  // Event operations
+  async getEvent(id: number): Promise<Event | undefined> {
+    const [event] = await db.select().from(events).where(eq(events.id, id));
+    return event;
+  }
+
+  async getEvents(): Promise<Event[]> {
+    return await db.select().from(events).orderBy(desc(events.createdAt));
+  }
+
+  async getEventsByUser(userId: number): Promise<Event[]> {
+    return await db
+      .select()
+      .from(events)
+      .where(eq(events.createdBy, userId))
+      .orderBy(desc(events.createdAt));
+  }
+
+  async createEvent(insertEvent: InsertEvent): Promise<Event> {
+    const [event] = await db.insert(events).values(insertEvent).returning();
+    return event;
+  }
+
+  async updateEvent(id: number, updates: Partial<Event>): Promise<Event | undefined> {
+    const [updatedEvent] = await db
+      .update(events)
+      .set(updates)
+      .where(eq(events.id, id))
+      .returning();
+    return updatedEvent;
+  }
+
+  async deleteEvent(id: number): Promise<boolean> {
+    const result = await db.delete(events).where(eq(events.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Photo operations
+  async getPhoto(id: number): Promise<Photo | undefined> {
+    const [photo] = await db.select().from(photos).where(eq(photos.id, id));
+    return photo;
+  }
+
+  async getPhotosByEvent(eventId: number): Promise<Photo[]> {
+    return await db
+      .select()
+      .from(photos)
+      .where(eq(photos.eventId, eventId))
+      .orderBy(desc(photos.uploadedAt));
+  }
+
+  async createPhoto(insertPhoto: InsertPhoto): Promise<Photo> {
+    const [photo] = await db.insert(photos).values(insertPhoto).returning();
+    return photo;
+  }
+
+  async updatePhoto(id: number, updates: Partial<Photo>): Promise<Photo | undefined> {
+    const [updatedPhoto] = await db
+      .update(photos)
+      .set(updates)
+      .where(eq(photos.id, id))
+      .returning();
+    return updatedPhoto;
+  }
+
+  async deletePhoto(id: number): Promise<boolean> {
+    const result = await db.delete(photos).where(eq(photos.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Photo history operations
+  async getPhotoHistory(userId: number): Promise<PhotoHistory[]> {
+    return await db
+      .select()
+      .from(photoHistory)
+      .where(eq(photoHistory.userId, userId))
+      .orderBy(desc(photoHistory.viewedAt));
+  }
+
+  async createPhotoHistory(insertHistory: InsertPhotoHistory): Promise<PhotoHistory> {
+    const [history] = await db.insert(photoHistory).values(insertHistory).returning();
+    return history;
+  }
+}
+
+// Use Database storage instead of in-memory storage
+export const storage = new DatabaseStorage();

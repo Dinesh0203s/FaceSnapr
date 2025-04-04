@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -49,6 +50,17 @@ export const events = pgTable("events", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Event relations
+export const eventsRelations = relations(events, ({ one, many }) => ({
+  creator: one(users, {
+    fields: [events.createdBy],
+    references: [users.id],
+    relationName: "user_events"
+  }),
+  photos: many(photos, { relationName: "event_photos" }),
+  photoHistory: many(photoHistory, { relationName: "event_photo_history" }),
+}));
+
 export const insertEventSchema = createInsertSchema(events).pick({
   name: true,
   description: true,
@@ -67,6 +79,16 @@ export const photos = pgTable("photos", {
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
 });
 
+// Photo relations
+export const photosRelations = relations(photos, ({ one, many }) => ({
+  event: one(events, {
+    fields: [photos.eventId],
+    references: [events.id],
+    relationName: "event_photos"
+  }),
+  photoHistory: many(photoHistory, { relationName: "photo_history" }),
+}));
+
 export const insertPhotoSchema = createInsertSchema(photos).pick({
   eventId: true,
   url: true,
@@ -82,11 +104,36 @@ export const photoHistory = pgTable("photo_history", {
   viewedAt: timestamp("viewed_at").defaultNow().notNull(),
 });
 
+// Photo history relations
+export const photoHistoryRelations = relations(photoHistory, ({ one }) => ({
+  user: one(users, {
+    fields: [photoHistory.userId],
+    references: [users.id],
+    relationName: "user_photo_history"
+  }),
+  event: one(events, {
+    fields: [photoHistory.eventId],
+    references: [events.id],
+    relationName: "event_photo_history"
+  }),
+  photo: one(photos, {
+    fields: [photoHistory.photoId],
+    references: [photos.id],
+    relationName: "photo_history"
+  }),
+}));
+
 export const insertPhotoHistorySchema = createInsertSchema(photoHistory).pick({
   userId: true,
   photoId: true,
   eventId: true,
 });
+
+// User relations - defined last to avoid forward reference issues
+export const usersRelations = relations(users, ({ many }) => ({
+  events: many(events, { relationName: "user_events" }),
+  photoHistory: many(photoHistory, { relationName: "user_photo_history" }),
+}));
 
 // Export types
 export type User = typeof users.$inferSelect;
