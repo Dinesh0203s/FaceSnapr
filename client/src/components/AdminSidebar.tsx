@@ -11,7 +11,7 @@ import {
   ChevronLeft
 } from 'lucide-react';
 import { useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/hooks/use-auth';
 
 interface AdminSidebarProps {
   className?: string;
