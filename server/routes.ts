@@ -1,8 +1,8 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { extractFaceDescriptors, findMatchingPhotos } from './face-recognition';
-import { authMiddleware, adminMiddleware, generateResetToken, isValidResetToken } from './auth';
+import { setupAuth, isAuthenticated as authMiddleware, isAdmin as adminMiddleware, generateResetToken, isValidResetToken } from './auth';
 import multer from 'multer';
 import path from 'path';
 import { 
@@ -12,7 +12,8 @@ import {
   userResetPasswordSchema,
   insertEventSchema,
   insertPhotoSchema,
-  insertPhotoHistorySchema
+  insertPhotoHistorySchema,
+  User
 } from "@shared/schema";
 import { z } from "zod";
 import fs from 'fs';
@@ -82,7 +83,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Auth endpoints
+  // Setup auth middleware and auth routes
+  setupAuth(app);
+
+  // Legacy Auth endpoints (will be replaced by setupAuth routes)
   app.post('/api/auth/register', async (req: Request, res: Response) => {
     try {
       const validatedData = insertUserSchema.safeParse(req.body);
@@ -194,23 +198,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { token, password } = validatedData.data;
       
-      // Find user with this reset token - should use getUsers in a real app
-      // This is a dummy implementation for demo purposes
-      const user = await storage.getUserByEmail('admin@gmail.com');
-      
-      // In a real implementation, we would get all users and find the one with matching token
-      // const users = await storage.getUsers();
-      // const user = users.find(u => u.resetToken === token);
+      // Find all users and search for the one with the matching token
+      const users = await storage.getUsers();
+      const user = users.find((u: User) => u.resetToken === token);
       
       // Only checking if user exists for the demo
       if (!user) {
         return res.status(400).json({ message: 'Invalid or expired reset token' });
       }
       
-      // In a real app, we would also check:
-      // if (!user.resetToken || user.resetToken !== token || !isValidResetToken(user.resetTokenExpiry)) {
-      //   return res.status(400).json({ message: 'Invalid or expired reset token' });
-      // }
+      // Check token validity
+      if (!user.resetToken || user.resetToken !== token || !isValidResetToken(user.resetTokenExpiry)) {
+        return res.status(400).json({ message: 'Invalid or expired reset token' });
+      }
       
       // Update user password and clear reset token
       await storage.updateUser(user.id, {

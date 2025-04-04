@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-// Temporarily comment out for debugging
-// import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,11 +25,7 @@ import {
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  // Temporarily use hardcoded values for debugging
-  const isAuthenticated = false;
-  const user = null;
-  const isAdmin = false;
-  const logout = () => console.log('logout');
+  const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [location] = useLocation();
 
@@ -66,20 +61,14 @@ export default function Navbar() {
               <span className="font-bold text-xl ml-2 text-foreground">FaceFind</span>
             </div>
             <div className="hidden sm:ml-8 sm:flex sm:space-x-6">
-              <Link href="/">
-                <a className={`text-sm px-3 py-2 font-medium border-b-2 ${isActive('/') ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-                  Home
-                </a>
+              <Link href="/" className={`text-sm px-3 py-2 font-medium border-b-2 ${isActive('/') ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+                Home
               </Link>
-              <Link href="/events">
-                <a className={`text-sm px-3 py-2 font-medium border-b-2 ${isActive('/events') ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-                  Events
-                </a>
+              <Link href="/events" className={`text-sm px-3 py-2 font-medium border-b-2 ${isActive('/events') ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+                Events
               </Link>
-              <Link href="/contact">
-                <a className={`text-sm px-3 py-2 font-medium border-b-2 ${isActive('/contact') ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-                  Contact
-                </a>
+              <Link href="/contact" className={`text-sm px-3 py-2 font-medium border-b-2 ${isActive('/contact') ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+                Contact
               </Link>
             </div>
           </div>
@@ -113,20 +102,16 @@ export default function Navbar() {
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/profile">
-                      <a className="flex items-center cursor-pointer">
-                        <User className="mr-2 h-4 w-4" />
-                        <span>Profile</span>
-                      </a>
+                    <Link href="/profile" className="flex items-center cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
                     </Link>
                   </DropdownMenuItem>
                   {isAdmin && (
                     <DropdownMenuItem asChild>
-                      <Link href="/admin">
-                        <a className="flex items-center cursor-pointer">
-                          <Settings className="mr-2 h-4 w-4" />
-                          <span>Admin Dashboard</span>
-                        </a>
+                      <Link href="/admin" className="flex items-center cursor-pointer">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Admin Dashboard</span>
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -144,15 +129,13 @@ export default function Navbar() {
               <div className="flex space-x-2">
                 <Button variant="ghost" asChild>
                   <Link href="/login">
-                    <a>Log in</a>
+                    Log in
                   </Link>
                 </Button>
                 <Button asChild>
-                  <Link href="/register">
-                    <a className="flex items-center">
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Sign up
-                    </a>
+                  <Link href="/register" className="flex items-center">
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Sign up
                   </Link>
                 </Button>
               </div>
@@ -181,41 +164,38 @@ export default function Navbar() {
       {mobileMenuOpen && (
         <div className="sm:hidden bg-card border-t border-border">
           <div className="px-2 pt-2 pb-3 space-y-1">
-            <Link href="/">
-              <a
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  isActive('/') 
-                    ? 'bg-primary/10 text-primary' 
-                    : 'text-foreground hover:bg-accent hover:text-accent-foreground'
-                }`}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Home
-              </a>
+            <Link 
+              href="/" 
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                isActive('/') 
+                  ? 'bg-primary/10 text-primary' 
+                  : 'text-foreground hover:bg-accent hover:text-accent-foreground'
+              }`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Home
             </Link>
-            <Link href="/events">
-              <a
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  isActive('/events') 
-                    ? 'bg-primary/10 text-primary' 
-                    : 'text-foreground hover:bg-accent hover:text-accent-foreground'
-                }`}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Events
-              </a>
+            <Link 
+              href="/events"
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                isActive('/events') 
+                  ? 'bg-primary/10 text-primary' 
+                  : 'text-foreground hover:bg-accent hover:text-accent-foreground'
+              }`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Events
             </Link>
-            <Link href="/contact">
-              <a
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
-                  isActive('/contact') 
-                    ? 'bg-primary/10 text-primary' 
-                    : 'text-foreground hover:bg-accent hover:text-accent-foreground'
-                }`}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Contact
-              </a>
+            <Link 
+              href="/contact"
+              className={`block px-3 py-2 rounded-md text-base font-medium ${
+                isActive('/contact') 
+                  ? 'bg-primary/10 text-primary' 
+                  : 'text-foreground hover:bg-accent hover:text-accent-foreground'
+              }`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Contact
             </Link>
             <button
               className={`flex w-full items-center px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-accent hover:text-accent-foreground`}
@@ -252,22 +232,20 @@ export default function Navbar() {
                 </div>
               </div>
               <div className="mt-3 px-2 space-y-1">
-                <Link href="/profile">
-                  <a 
+                <Link 
+                  href="/profile"
+                  className="block px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Your Profile
+                </Link>
+                {isAdmin && (
+                  <Link 
+                    href="/admin"
                     className="block px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Your Profile
-                  </a>
-                </Link>
-                {isAdmin && (
-                  <Link href="/admin">
-                    <a 
-                      className="block px-3 py-2 rounded-md text-base font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      Admin Dashboard
-                    </a>
+                    Admin Dashboard
                   </Link>
                 )}
                 <button
@@ -284,17 +262,19 @@ export default function Navbar() {
           ) : (
             <div className="pt-4 pb-3 border-t border-border px-5 space-y-2">
               <Button className="w-full" asChild>
-                <Link href="/login">
-                  <a onClick={() => setMobileMenuOpen(false)}>
-                    Log in
-                  </a>
+                <Link 
+                  href="/login" 
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Log in
                 </Link>
               </Button>
               <Button variant="outline" className="w-full" asChild>
-                <Link href="/register">
-                  <a onClick={() => setMobileMenuOpen(false)}>
-                    Sign up
-                  </a>
+                <Link 
+                  href="/register" 
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Sign up
                 </Link>
               </Button>
             </div>

@@ -74,10 +74,8 @@ export default function Login() {
             </h2>
             <p className="mt-2 text-center text-sm text-muted-foreground">
               Or{" "}
-              <Link href="/register">
-                <a className="font-medium text-primary hover:text-primary/80">
-                  create a new account
-                </a>
+              <Link href="/register" className="font-medium text-primary hover:text-primary/80">
+                create a new account
               </Link>
             </p>
           </div>
@@ -105,10 +103,8 @@ export default function Login() {
                   <FormItem>
                     <div className="flex items-center justify-between">
                       <FormLabel>Password</FormLabel>
-                      <Link href="/forgot-password">
-                        <a className="text-sm font-medium text-primary hover:text-primary/80">
-                          Forgot your password?
-                        </a>
+                      <Link href="/forgot-password" className="text-sm font-medium text-primary hover:text-primary/80">
+                        Forgot your password?
                       </Link>
                     </div>
                     <FormControl>
