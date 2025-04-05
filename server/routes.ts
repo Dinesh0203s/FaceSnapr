@@ -263,32 +263,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { eventId, pin } = req.body;
       
       if (!eventId || !pin) {
+        console.log('Invalid PIN verification request - missing eventId or pin');
         return res.status(400).json({ message: 'Event ID and PIN are required' });
       }
       
+      console.log(`Processing PIN verification for event ${eventId} with PIN: ${pin}`);
+      
       const numericEventId = parseInt(eventId);
+      if (isNaN(numericEventId)) {
+        console.log(`Invalid event ID: ${eventId}`);
+        return res.status(400).json({ message: 'Invalid event ID' });
+      }
+      
       const event = await storage.getEvent(numericEventId);
       
       if (!event) {
+        console.log(`Event not found: ${numericEventId}`);
         return res.status(404).json({ message: 'Event not found' });
       }
       
+      console.log(`Verifying PIN for event: ${event.name} (ID: ${numericEventId})`);
+      console.log(`Event PIN: "${event.pin}", Provided PIN: "${pin}"`);
+      
       if (event.pin !== pin) {
-        console.log(`PIN verification failed for event ${numericEventId}. Expected: "${event.pin}", Received: "${pin}"`);
+        console.log(`PIN verification failed for event ${numericEventId}`);
         return res.status(403).json({ message: 'Invalid PIN' });
       }
       
-      // Save event access in the user's session
-      if (!req.session.eventPins) {
+      // Make sure the session object exists
+      if (!req.session) {
+        console.log('No session object available');
+        return res.status(500).json({ message: 'Session not available' });
+      }
+      
+      // Initialize eventPins object if it doesn't exist
+      if (typeof (req.session as any).eventPins !== 'object') {
+        console.log('Initializing eventPins in session');
         (req.session as any).eventPins = {};
       }
+      
+      // Save event access in the user's session
       (req.session as any).eventPins[numericEventId] = true;
       
-      console.log(`PIN verification successful for event ${numericEventId}. Access saved in session.`);
+      // Force session save to ensure it persists
+      req.session.save((err) => {
+        if (err) {
+          console.error('Error saving session:', err);
+        } else {
+          console.log('Session saved successfully');
+        }
+      });
+      
+      console.log(`PIN verification successful for event ${numericEventId}`);
+      console.log('Updated session:', JSON.stringify(req.session));
       
       res.json({ message: 'Access granted', event });
     } catch (error) {
-      console.error(error);
+      console.error('Error in PIN verification:', error);
       res.status(500).json({ message: 'Failed to verify event access' });
     }
   });
@@ -421,13 +452,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Event not found' });
       }
       
+      console.log(`Request for photos of event ${eventId}`);
+      
       // Check if the event has a PIN and if the user has access
       if (event.pin) {
+        // Access debug information about the session
+        console.log('Session data:', JSON.stringify(req.session || {}));
+        
         // Get the user's session data for this event
         const sessionEventPins = (req.session as any).eventPins || {};
-        const hasAccess = sessionEventPins[eventId] === true;
+        console.log(`Event pins in session:`, sessionEventPins);
         
-        if (!hasAccess) {
+        const hasAccess = sessionEventPins[eventId] === true;
+        console.log(`User has access to event ${eventId}: ${hasAccess}`);
+        
+        // Allow admin users to bypass PIN
+        const isAdmin = req.isAuthenticated() && (req.user as any)?.isAdmin === true;
+        console.log(`User is admin: ${isAdmin}`);
+        
+        if (!hasAccess && !isAdmin) {
+          console.log(`Access denied to event ${eventId} photos - PIN required`);
           return res.status(403).json({ 
             message: 'PIN required to access this event',
             requiresPin: true
@@ -435,6 +479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      console.log(`Access granted to event ${eventId} photos`);
       const photos = await storage.getPhotosByEvent(eventId);
       res.json(photos);
     } catch (error) {
