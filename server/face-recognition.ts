@@ -135,11 +135,16 @@ export async function extractFaceDescriptors(imageBuffer: Buffer): Promise<Float
     await initFaceApi();
     
     const img = await faceapi.bufferToImage(imageBuffer);
+    console.log('Image loaded for processing');
+    
     const detections = await faceapi.detectAllFaces(img)
       .withFaceLandmarks()
       .withFaceDescriptors();
     
+    console.log(`Detected ${detections.length} faces`);
+    
     if (detections.length === 0) {
+      console.log('No faces detected in image');
       return null;
     }
     

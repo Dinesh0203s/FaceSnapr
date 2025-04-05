@@ -8,15 +8,21 @@ export async function initFaceApi() {
   if (modelsLoaded) return;
   
   try {
-    // First try loading models from local public directory
-    await Promise.all([
-      faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
-      faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
-      faceapi.nets.faceRecognitionNet.loadFromUri('/models')
-    ]);
+    const modelPath = '/models';
+    console.log('Loading models from:', modelPath);
+    
+    // Load models sequentially to better handle errors
+    await faceapi.nets.ssdMobilenetv1.loadFromUri(modelPath);
+    console.log('Loaded SSD MobileNet model');
+    
+    await faceapi.nets.faceLandmark68Net.loadFromUri(modelPath);
+    console.log('Loaded Face Landmark model');
+    
+    await faceapi.nets.faceRecognitionNet.loadFromUri(modelPath);
+    console.log('Loaded Face Recognition model');
     
     modelsLoaded = true;
-    console.log('Face-api models loaded successfully from local path');
+    console.log('All face-api models loaded successfully');
   } catch (error) {
     console.error('Error loading face-api models:', error);
     
