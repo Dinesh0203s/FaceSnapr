@@ -137,9 +137,17 @@ export async function extractFaceDescriptors(imageBuffer: Buffer): Promise<Float
     const img = await faceapi.bufferToImage(imageBuffer);
     console.log('Image loaded for processing');
     
-    const detections = await faceapi.detectAllFaces(img)
+    // Try both detectors
+    let detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
       .withFaceDescriptors();
+      
+    if (detections.length === 0) {
+      // Fallback to SSD MobileNet if TinyFaceDetector fails
+      detections = await faceapi.detectAllFaces(img, new faceapi.SsdMobilenetv1Options())
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+    }
     
     console.log(`Detected ${detections.length} faces`);
     
