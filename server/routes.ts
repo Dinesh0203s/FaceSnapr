@@ -266,15 +266,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Event ID and PIN are required' });
       }
       
-      const event = await storage.getEvent(parseInt(eventId));
+      const numericEventId = parseInt(eventId);
+      const event = await storage.getEvent(numericEventId);
       
       if (!event) {
         return res.status(404).json({ message: 'Event not found' });
       }
       
       if (event.pin !== pin) {
+        console.log(`PIN verification failed for event ${numericEventId}. Expected: "${event.pin}", Received: "${pin}"`);
         return res.status(403).json({ message: 'Invalid PIN' });
       }
+      
+      // Save event access in the user's session
+      if (!req.session.eventPins) {
+        (req.session as any).eventPins = {};
+      }
+      (req.session as any).eventPins[numericEventId] = true;
+      
+      console.log(`PIN verification successful for event ${numericEventId}. Access saved in session.`);
       
       res.json({ message: 'Access granted', event });
     } catch (error) {
@@ -409,6 +419,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!event) {
         return res.status(404).json({ message: 'Event not found' });
+      }
+      
+      // Check if the event has a PIN and if the user has access
+      if (event.pin) {
+        // Get the user's session data for this event
+        const sessionEventPins = (req.session as any).eventPins || {};
+        const hasAccess = sessionEventPins[eventId] === true;
+        
+        if (!hasAccess) {
+          return res.status(403).json({ 
+            message: 'PIN required to access this event',
+            requiresPin: true
+          });
+        }
       }
       
       const photos = await storage.getPhotosByEvent(eventId);
