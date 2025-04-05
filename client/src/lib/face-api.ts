@@ -11,13 +11,26 @@ export async function initFaceApi() {
     const modelPath = '/models';
     console.log('Loading models from:', modelPath);
     
-    // Ensure all models are loaded before proceeding
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(modelPath),
-      faceapi.nets.ssdMobilenetv1.loadFromUri(modelPath),
-      faceapi.nets.faceLandmark68Net.loadFromUri(modelPath),
-      faceapi.nets.faceRecognitionNet.loadFromUri(modelPath)
-    ]);
+    try {
+      const requiredModels = [
+        { net: faceapi.nets.ssdMobilenetv1, name: 'ssd_mobilenetv1_model' },
+        { net: faceapi.nets.faceLandmark68Net, name: 'face_landmark_68_model' },
+        { net: faceapi.nets.faceRecognitionNet, name: 'face_recognition_model' }
+      ];
+
+      // Check if model files exist
+      for (const model of requiredModels) {
+        const manifestUrl = `${modelPath}/${model.name}-weights_manifest.json`;
+        const response = await fetch(manifestUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to load ${model.name} manifest`);
+        }
+      }
+
+      // Load models
+      await Promise.all(requiredModels.map(model => 
+        model.net.loadFromUri(modelPath)
+      ));
     
     console.log('All face-api models loaded successfully');
     
