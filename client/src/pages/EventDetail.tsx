@@ -53,8 +53,14 @@ export default function EventDetail({ id }: EventDetailProps) {
     queryKey: [`/api/events/${id}/photos`],
     enabled: Boolean(event),
     onError: (error) => {
+      console.log("Error loading photos:", error);
+      
       // Check if error is due to PIN requirement
-      if (error instanceof Error && error.message.includes("PIN")) {
+      if (error instanceof Error && 
+          (error.message.includes("PIN") || 
+           error.message.includes("403") || 
+           error.message.includes("401"))) {
+        console.log("PIN required - opening PIN modal");
         setIsPinModalOpen(true);
       } else {
         toast({

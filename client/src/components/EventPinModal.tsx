@@ -54,10 +54,28 @@ export default function EventPinModal({ eventId, eventName, isOpen, onClose }: E
   // PIN verification mutation
   const pinMutation = useMutation({
     mutationFn: async (data: PinFormValues) => {
-      return apiRequest('POST', '/api/events/access', { 
-        eventId, 
-        pin: data.pin 
+      console.log(`Verifying PIN for event ${eventId} with PIN ${data.pin}`);
+      
+      // Using fetch directly for debugging purposes
+      const response = await fetch('/api/events/access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          eventId, 
+          pin: data.pin 
+        }),
+        credentials: 'include'
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("PIN verification failed:", errorData);
+        throw new Error(errorData.message || "Failed to verify PIN");
+      }
+      
+      const result = await response.json();
+      console.log("PIN verification successful:", result);
+      return result;
     },
     onSuccess: () => {
       setIsVerified(true);
@@ -74,6 +92,7 @@ export default function EventPinModal({ eventId, eventName, isOpen, onClose }: E
       }, 1500);
     },
     onError: (error) => {
+      console.error("PIN verification error:", error);
       toast({
         title: "Access Denied",
         description: error instanceof Error 
