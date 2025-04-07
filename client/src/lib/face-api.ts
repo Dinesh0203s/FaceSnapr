@@ -1,4 +1,3 @@
-
 import * as faceapi from 'face-api.js';
 
 // Track whether models have been loaded
@@ -79,43 +78,30 @@ export async function detectFaces(imgElement: HTMLImageElement) {
   }
 }
 
-// Process an image for face recognition and return face descriptors
-export async function processFaceImage(file: File): Promise<{ success: boolean, message?: string, faceDescriptors?: Float32Array[] }> {
+// Process an image for face detection
+export async function processFaceImage(file: File): Promise<{ success: boolean, message?: string }> {
   try {
-    await initFaceApi();
-    
-    // Create img element from file
-    const img = await createImageFromFile(file);
-    
-    // Detect faces
-    const detections = await faceapi
-      .detectAllFaces(img)
-      .withFaceLandmarks()
-      .withFaceDescriptors();
-    
-    // If no faces detected
-    if (detections.length === 0) {
-      return { 
-        success: false, 
-        message: "No faces detected in the image. Please try a different photo." 
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    const response = await fetch('/api/detect-face', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!data.success) {
+      return {
+        success: false,
+        message: data.message || "Face detection failed"
       };
     }
-    
-    // If too many faces detected
-    if (detections.length > 1) {
-      return { 
-        success: false, 
-        message: "Multiple faces detected. Please use a photo with only your face." 
-      };
-    }
-    
-    // Extract face descriptors (features that identify the face)
-    const faceDescriptors = detections.map(d => d.descriptor);
-    
+
     return {
-      success: true,
-      faceDescriptors
+      success: true
     };
+
   } catch (error) {
     console.error('Error processing face image:', error);
     return {
@@ -130,17 +116,17 @@ function createImageFromFile(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
-    
+
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
       resolve(img);
     };
-    
-    img.onerror = (error) => {
+
+    img.onerror = () => {
       URL.revokeObjectURL(objectUrl);
       reject(new Error('Failed to load image'));
     };
-    
+
     img.src = objectUrl;
   });
 }
