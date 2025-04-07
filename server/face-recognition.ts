@@ -1,7 +1,14 @@
 import vision from '@google-cloud/vision';
 
-// Create a client
-const client = new vision.ImageAnnotatorClient();
+// Create a client with API key from environment variables
+const client = new vision.ImageAnnotatorClient({
+  credentials: {
+    client_email: process.env.GOOGLE_CLOUD_CLIENT_EMAIL || '',
+    private_key: process.env.GOOGLE_CLOUD_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
+  },
+  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+  apiEndpoint: 'vision.googleapis.com',
+});
 
 // Define the threshold for face matching (adjusted for confidence score)
 const FACE_MATCH_THRESHOLD = 0.8;
